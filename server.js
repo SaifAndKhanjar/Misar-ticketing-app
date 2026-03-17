@@ -7,6 +7,7 @@ import { networkInterfaces } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import jwt from 'jsonwebtoken';
+import { createClient } from '@supabase/supabase-js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,6 +16,10 @@ const PORT = Number(process.env.PORT) || 3001;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'saif';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5173';
+
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 const app = express();
 const server = http.createServer(app);
@@ -53,7 +58,6 @@ app.post('/api/login', (req, res) => {
 });
 
 let queue = [];
-let nextId = 1;
 let currentStartedAt = null;
 
 const MINS_PER_MISAR = 3;
@@ -82,6 +86,19 @@ const getQueueState = () => {
   return { customers, totalWait };
 };
 
+async function loadQueueFromSupabase() {
+  if (!supabase) return;
+  const { data: rows } = await supabase.from('queue').select('id, name, phone, misars, joined_at').order('id', { ascending: true });
+  const { data: meta } = await supabase.from('queue_meta').select('current_started_at').eq('id', 1).single();
+  if (rows) queue = rows.map(r => ({ id: r.id, name: r.name, phone: r.phone, misars: r.misars, joinedAt: r.joined_at }));
+  if (meta?.current_started_at != null) currentStartedAt = meta.current_started_at;
+}
+
+async function saveMetaToSupabase() {
+  if (!supabase) return;
+  await supabase.from('queue_meta').update({ current_started_at: currentStartedAt }).eq('id', 1);
+}
+
 setInterval(() => {
   if (queue.length > 0) {
     io.emit('queue:update', getQueueState());
@@ -106,49 +123,83 @@ function validateJoinBody(body) {
   return { name, phone, misars };
 }
 
-app.post('/api/join', (req, res) => {
+app.post('/api/join', async (req, res) => {
   const validated = validateJoinBody(req.body);
   if (validated.error) {
     return res.status(validated.status || 400).json({ error: validated.error });
   }
   const { name, phone, misars } = validated;
-  const ticket = { id: nextId++, name, phone, misars, joinedAt: Date.now() };
+  const joinedAt = Date.now();
 
-  if (queue.length === 0) {
-    currentStartedAt = Date.now();
+  if (supabase) {
+    const { data: row, error } = await supabase.from('queue').insert({ name, phone, misars, joined_at: joinedAt }).select('id, name, phone, misars, joined_at').single();
+    if (error) {
+      return res.status(500).json({ error: 'Failed to join queue' });
+    }
+    const ticket = { id: row.id, name: row.name, phone: row.phone, misars: row.misars, joinedAt: row.joined_at };
+    if (queue.length === 0) {
+      currentStartedAt = joinedAt;
+      await saveMetaToSupabase();
+    }
+    queue.push(ticket);
+    const state = getQueueState();
+    io.emit('queue:update', state);
+    return res.json(state.customers.find(c => c.id === ticket.id));
   }
 
+  const nextId = queue.length === 0 ? 1 : Math.max(...queue.map(c => c.id), 0) + 1;
+  const ticket = { id: nextId, name, phone, misars, joinedAt };
+  if (queue.length === 0) currentStartedAt = joinedAt;
   queue.push(ticket);
   const state = getQueueState();
   io.emit('queue:update', state);
   res.json(state.customers.find(c => c.id === ticket.id));
 });
 
-app.delete('/api/queue/:id/done', authMiddleware, (req, res) => {
+app.delete('/api/queue/:id/done', authMiddleware, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (Number.isNaN(id)) {
     return res.status(400).json({ error: 'Invalid id' });
   }
   const isFront = queue.length > 0 && queue[0].id === id;
+  if (supabase) {
+    const { error } = await supabase.from('queue').delete().eq('id', id);
+    if (error) return res.status(500).json({ error: 'Failed to update queue' });
+  }
   queue = queue.filter(c => c.id !== id);
-  if (isFront) currentStartedAt = queue.length > 0 ? Date.now() : null;
+  if (isFront) {
+    currentStartedAt = queue.length > 0 ? Date.now() : null;
+    if (supabase) await saveMetaToSupabase();
+  }
   io.emit('queue:update', getQueueState());
   res.json({ ok: true });
 });
 
-app.delete('/api/queue/:id', authMiddleware, (req, res) => {
+app.delete('/api/queue/:id', authMiddleware, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (Number.isNaN(id)) {
     return res.status(400).json({ error: 'Invalid id' });
   }
   const isFront = queue.length > 0 && queue[0].id === id;
+  if (supabase) {
+    const { error } = await supabase.from('queue').delete().eq('id', id);
+    if (error) return res.status(500).json({ error: 'Failed to update queue' });
+  }
   queue = queue.filter(c => c.id !== id);
-  if (isFront) currentStartedAt = queue.length > 0 ? Date.now() : null;
+  if (isFront) {
+    currentStartedAt = queue.length > 0 ? Date.now() : null;
+    if (supabase) await saveMetaToSupabase();
+  }
   io.emit('queue:update', getQueueState());
   res.json({ ok: true });
 });
 
 app.get('/api/server-info', authMiddleware, (req, res) => {
+  const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL;
+  if (baseUrl) {
+    const url = baseUrl.replace(/\/$/, '');
+    return res.json({ ip: url, port: PORT, joinUrl: `${url}/join` });
+  }
   const nets = networkInterfaces();
   let ip = 'localhost';
   for (const name of Object.keys(nets)) {
@@ -157,7 +208,7 @@ app.get('/api/server-info', authMiddleware, (req, res) => {
     }
     if (ip !== 'localhost') break;
   }
-  res.json({ ip, port: PORT });
+  res.json({ ip, port: PORT, joinUrl: `http://${ip}:${PORT}/join` });
 });
 
 // SPA fallback (Express 5 / path-to-regexp doesn't accept bare '*')
@@ -167,6 +218,18 @@ app.get(/^(?!\/api\/).*/, (req, res) => {
   });
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server on ${PORT}`);
-});
+async function start() {
+  if (supabase) {
+    try {
+      await loadQueueFromSupabase();
+      console.log('Queue loaded from Supabase');
+    } catch (err) {
+      console.warn('Supabase load failed, starting with empty queue:', err.message);
+    }
+  }
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server on ${PORT}${supabase ? ' (Supabase enabled)' : ''}`);
+  });
+}
+
+start();

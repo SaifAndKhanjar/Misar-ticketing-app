@@ -115,7 +115,7 @@ function getAuthHeaders() {
 function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem('admin_token'));
   const [queueData, setQueueData] = useState({ customers: [], totalWait: 0 });
-  const [serverInfo, setServerInfo] = useState({ ip: 'localhost', port: 3001 });
+  const [serverInfo, setServerInfo] = useState({ joinUrl: 'http://localhost:3001/join' });
   const [actionError, setActionError] = useState('');
   const [loadingId, setLoadingId] = useState(null);
 
@@ -201,7 +201,7 @@ function AdminDashboard() {
     }
   };
 
-  const joinUrl = `http://${serverInfo.ip}:${serverInfo.port}/join`;
+  const joinUrl = serverInfo.joinUrl || `http://${serverInfo.ip || 'localhost'}:${serverInfo.port || 3001}/join`;
   const { customers, totalWait } = queueData;
 
   return (

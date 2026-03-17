@@ -6,7 +6,7 @@ Queue management system for the Misar shop (Saif & Khanjar). Customers join a qu
 
 - **Backend:** Node.js, Express 5, Socket.IO
 - **Frontend:** React 19, Vite 8, React Router, Socket.IO client
-- **Data:** In-memory queue (no database)
+- **Data:** In-memory queue; optional [Supabase](https://supabase.com) for persistence
 
 ## Setup
 
@@ -20,8 +20,11 @@ Queue management system for the Misar shop (Saif & Khanjar). Customers join a qu
    - `JWT_SECRET` — secret for signing auth tokens (use a long random string)
    - `PORT` — server port (default `3001`)
    - `FRONTEND_ORIGIN` — allowed CORS/Socket.IO origin (default `http://localhost:5173`)
+   - `SUPABASE_URL` and `SUPABASE_ANON_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`) — optional; if set, the queue is stored in Supabase and survives restarts.
 
-3. Add `public/logo.png` if you want the logo to appear in the UI (optional).
+3. **Supabase (optional):** In your Supabase project, run the SQL in `supabase/schema.sql` (SQL Editor → New query → paste → Run). Then set `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `.env`.
+
+4. Add `public/logo.png` if you want the logo to appear in the UI (optional).
 
 ## Development
 
@@ -59,10 +62,12 @@ Host the whole app (frontend + backend) on [Render](https://render.com) in one s
 5. In **Environment**, add:
    - `ADMIN_PASSWORD` — your admin dashboard password (required).
    - `JWT_SECRET` — a long random string (e.g. generate one; required for production).
+   - `SUPABASE_URL` — your Supabase project URL (e.g. `https://xxx.supabase.co`).
+   - `SUPABASE_ANON_KEY` or `SUPABASE_SERVICE_ROLE_KEY` — from Supabase Project Settings → API. Service role is recommended for the backend.
    - `FRONTEND_ORIGIN` is optional: on Render it defaults to your service URL so CORS and Socket.IO work.
 6. Click **Create Web Service**. After the first deploy you’ll get a URL like `https://misar-ticketing-app.onrender.com`.
 
-**Note:** On the free tier the service may spin down after inactivity; the first request after a while can be slow. The queue is in-memory, so it resets when the service restarts.
+**Note:** On the free tier the service may spin down after inactivity; the first request after a while can be slow. With Supabase configured, the queue persists across restarts.
 
 ## Scripts
 
