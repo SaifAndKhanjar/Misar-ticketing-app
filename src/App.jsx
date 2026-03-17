@@ -1,24 +1,32 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, memo, useRef } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import {
-  Users, Clock, CheckCircle, Trash2, Scissors,
-  Star, RefreshCw, QrCode, Phone, ExternalLink
+  Users, CheckCircle, Trash2, Scissors,
+  Star, QrCode, Phone, ExternalLink
 } from 'lucide-react';
-import { socket } from './socket';
+import { socket, useSocketStatus } from './socket';
 import CustomerJoin from './CustomerJoin';
 import { formatTime } from './utils/format';
 import { MINS_PER_MISAR } from './constants';
 import './App.css';
 
-// ─── Header ────────────────────────────────────────────────────────────────────
-function Header({ queueCount, onLogout }) {
-  const [now, setNow] = useState(new Date());
+// ─── LiveClock (isolates 1s tick so Header doesn't re-render every second) ─────
+function LiveClock() {
+  const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+  return (
+    <div className="live-clock">
+      {now.toLocaleTimeString('en-OM', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+    </div>
+  );
+}
 
+// ─── Header ────────────────────────────────────────────────────────────────────
+function Header({ queueCount, onLogout }) {
   return (
     <header className="header">
       <div className="header-inner">
@@ -30,7 +38,7 @@ function Header({ queueCount, onLogout }) {
           </div>
         </div>
         <div className="header-meta">
-          <div className="live-clock">{now.toLocaleTimeString('en-OM', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}</div>
+          <LiveClock />
           {queueCount > 0 && (
             <div className="queue-badge">
               <Users size={14} />
@@ -106,6 +114,53 @@ function Login({ onLogin }) {
   );
 }
 
+// ─── Queue card (memoized to avoid re-renders when only wait times change) ─────
+const QueueCard = memo(function QueueCard({ customer, index, onDone, onRemove, loadingId }) {
+  return (
+    <div className={`queue-card ${index === 0 ? 'queue-card--active' : ''}`}>
+      <div className="queue-card-left">
+        <div className={`position-badge ${index === 0 ? 'position-badge--active' : ''}`}>
+          {index === 0 ? <Star size={14} /> : index + 1}
+        </div>
+        <div className="customer-info">
+          <strong className="customer-name">{customer.name}</strong>
+          <div className="customer-meta">
+            <span className="meta-pill"><Scissors size={11} /> {customer.misars} misars</span>
+            <span className="meta-pill"><Phone size={11} /> {customer.phone}</span>
+          </div>
+        </div>
+      </div>
+      <div className="queue-card-right">
+        <div className="wait-info">
+          {index === 0 ? (
+            <span className="wait-now">Up Next!</span>
+          ) : (
+            <span className="wait-value">{formatTime(customer.waitBefore)}</span>
+          )}
+        </div>
+        <div className="card-actions">
+          <button
+            className="btn-done"
+            onClick={() => onDone(customer.id)}
+            title="Mark as Done"
+            disabled={loadingId !== null}
+          >
+            <CheckCircle size={18} />
+          </button>
+          <button
+            className="btn-remove"
+            onClick={() => onRemove(customer.id)}
+            title="Remove"
+            disabled={loadingId !== null}
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 // ─── Admin View ────────────────────────────────────────────────────────────────
 function getAuthHeaders() {
   const token = localStorage.getItem('admin_token');
@@ -117,7 +172,24 @@ function AdminDashboard() {
   const [queueData, setQueueData] = useState({ customers: [], totalWait: 0, queueOpen: true });
   const [serverInfo, setServerInfo] = useState({ joinUrl: 'http://localhost:3001/join' });
   const [actionError, setActionError] = useState('');
+  const actionErrorTimeoutRef = useRef(null);
   const [loadingId, setLoadingId] = useState(null);
+  const [toggleLoading, setToggleLoading] = useState(false);
+  const socketStatus = useSocketStatus();
+
+  const setActionErrorWithAutoClear = useCallback((message) => {
+    if (actionErrorTimeoutRef.current) clearTimeout(actionErrorTimeoutRef.current);
+    setActionError(message);
+    if (message) {
+      actionErrorTimeoutRef.current = setTimeout(() => setActionError(''), 5000);
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (actionErrorTimeoutRef.current) clearTimeout(actionErrorTimeoutRef.current);
+    };
+  }, []);
 
   const handleUnauthorized = useCallback(() => {
     localStorage.removeItem('admin_auth');
@@ -136,7 +208,7 @@ function AdminDashboard() {
         const data = await r.json();
         setQueueData(data);
       })
-      .catch(() => setActionError('Failed to load queue'));
+      .catch(() => setActionErrorWithAutoClear('Failed to load queue'));
 
     fetch('/api/server-info', { headers })
       .then(async (r) => {
@@ -144,7 +216,7 @@ function AdminDashboard() {
         const data = await r.json();
         setServerInfo(data);
       })
-      .catch(() => setActionError('Failed to load server info'));
+      .catch(() => setActionErrorWithAutoClear('Failed to load server info'));
 
     socket.on('queue:update', (data) => setQueueData(data));
 
@@ -167,17 +239,30 @@ function AdminDashboard() {
   }
 
   const handleDone = async (id) => {
-    setLoadingId(id);
     setActionError('');
+    const prev = queueData;
+    const removed = prev.customers.find(c => c.id === id);
+    setQueueData(prevState => ({
+      ...prevState,
+      customers: prevState.customers.filter(c => c.id !== id),
+      totalWait: Math.max(0, (prevState.totalWait || 0) - ((removed?.misars ?? 0) * MINS_PER_MISAR))
+    }));
+    setLoadingId(id);
     try {
       const res = await fetch(`/api/queue/${id}/done`, {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
-      if (res.status === 401) handleUnauthorized();
-      else if (!res.ok) setActionError('Failed to update queue');
+      if (res.status === 401) {
+        setQueueData(prev);
+        handleUnauthorized();
+      } else if (!res.ok) {
+        setQueueData(prev);
+        setActionErrorWithAutoClear('Failed to update queue');
+      }
     } catch {
-      setActionError('Connection error');
+      setQueueData(prev);
+      setActionErrorWithAutoClear('Connection error');
     } finally {
       setLoadingId(null);
     }
@@ -185,17 +270,28 @@ function AdminDashboard() {
 
   const handleRemove = async (id) => {
     if (!window.confirm('Remove this customer from the queue?')) return;
-    setLoadingId(id);
     setActionError('');
+    const prev = queueData;
+    setQueueData(prevState => ({
+      ...prevState,
+      customers: prevState.customers.filter(c => c.id !== id)
+    }));
+    setLoadingId(id);
     try {
       const res = await fetch(`/api/queue/${id}`, {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
-      if (res.status === 401) handleUnauthorized();
-      else if (!res.ok) setActionError('Failed to update queue');
+      if (res.status === 401) {
+        setQueueData(prev);
+        handleUnauthorized();
+      } else if (!res.ok) {
+        setQueueData(prev);
+        setActionErrorWithAutoClear('Failed to update queue');
+      }
     } catch {
-      setActionError('Connection error');
+      setQueueData(prev);
+      setActionErrorWithAutoClear('Connection error');
     } finally {
       setLoadingId(null);
     }
@@ -203,6 +299,7 @@ function AdminDashboard() {
 
   const handleToggleQueue = async () => {
     setActionError('');
+    setToggleLoading(true);
     try {
       const res = await fetch('/api/queue/toggle', {
         method: 'POST',
@@ -212,9 +309,11 @@ function AdminDashboard() {
       else if (res.ok) {
         const data = await res.json();
         setQueueData(prev => ({ ...prev, queueOpen: data.queueOpen }));
-      } else setActionError('Failed to update queue status');
+      } else setActionErrorWithAutoClear('Failed to update queue status');
     } catch {
-      setActionError('Connection error');
+      setActionErrorWithAutoClear('Connection error');
+    } finally {
+      setToggleLoading(false);
     }
   };
 
@@ -275,8 +374,9 @@ function AdminDashboard() {
                 type="button"
                 className={`queue-status-btn ${queueOpen ? 'queue-status-btn--stop' : 'queue-status-btn--start'}`}
                 onClick={handleToggleQueue}
+                disabled={toggleLoading}
               >
-                {queueOpen ? 'Stop queue' : 'Start queue'}
+                {toggleLoading ? 'Updating…' : queueOpen ? 'Stop queue' : 'Start queue'}
               </button>
             </div>
           </aside>
@@ -307,6 +407,12 @@ function AdminDashboard() {
               </h2>
             </div>
 
+            {socketStatus !== 'connected' && (
+              <div className="socket-status-banner" role="status">
+                {socketStatus === 'connecting' ? 'Reconnecting…' : 'Connection lost'}
+              </div>
+            )}
+
             {actionError && (
               <div className="login-error" style={{ marginBottom: '1rem' }}>
                 {actionError}
@@ -322,47 +428,14 @@ function AdminDashboard() {
                 </div>
               ) : (
                 customers.map((customer, i) => (
-                  <div key={customer.id} className={`queue-card ${i === 0 ? 'queue-card--active' : ''}`}>
-                    <div className="queue-card-left">
-                      <div className={`position-badge ${i === 0 ? 'position-badge--active' : ''}`}>
-                        {i === 0 ? <Star size={14} /> : i + 1}
-                      </div>
-                      <div className="customer-info">
-                        <strong className="customer-name">{customer.name}</strong>
-                        <div className="customer-meta">
-                          <span className="meta-pill"><Scissors size={11} /> {customer.misars} misars</span>
-                          <span className="meta-pill"><Phone size={11} /> {customer.phone}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="queue-card-right">
-                      <div className="wait-info">
-                        {i === 0 ? (
-                          <span className="wait-now">Up Next!</span>
-                        ) : (
-                          <span className="wait-value">{formatTime(customer.waitBefore)}</span>
-                        )}
-                      </div>
-                      <div className="card-actions">
-                        <button
-                          className="btn-done"
-                          onClick={() => handleDone(customer.id)}
-                          title="Mark as Done"
-                          disabled={loadingId !== null}
-                        >
-                          <CheckCircle size={18} />
-                        </button>
-                        <button
-                          className="btn-remove"
-                          onClick={() => handleRemove(customer.id)}
-                          title="Remove"
-                          disabled={loadingId !== null}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  <QueueCard
+                    key={customer.id}
+                    customer={customer}
+                    index={i}
+                    onDone={handleDone}
+                    onRemove={handleRemove}
+                    loadingId={loadingId}
+                  />
                 ))
               )}
             </div>

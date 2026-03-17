@@ -64,36 +64,32 @@ let queueOpen = true;
 const MINS_PER_MISAR = 3;
 const QUEUE_TICK_MS = 60_000;
 
-const getWait = (idx) => {
-  let baseWait = queue.slice(0, idx).reduce((s, c) => s + c.misars * MINS_PER_MISAR, 0);
-  if (idx > 0 && currentStartedAt) {
-    const elapsed = Math.floor((Date.now() - currentStartedAt) / 60000);
-    baseWait = Math.max(0, baseWait - elapsed);
-  }
-  return baseWait;
-};
-
-const getQueueState = () => {
+function getQueueState() {
   const now = Date.now();
-  let elapsed = 0;
-  if (queue.length > 0 && currentStartedAt) {
-    elapsed = Math.floor((now - currentStartedAt) / 60000);
-  }
-
-  const customers = queue.map((c, i) => ({ ...c, position: i + 1, waitBefore: getWait(i) }));
-  const totalFullWait = queue.reduce((s, c) => s + c.misars * MINS_PER_MISAR, 0);
+  const elapsed = queue.length > 0 && currentStartedAt
+    ? Math.floor((now - currentStartedAt) / 60000)
+    : 0;
+  let cumulative = 0;
+  const customers = queue.map((c, i) => {
+    const baseWait = cumulative;
+    cumulative += c.misars * MINS_PER_MISAR;
+    const waitBefore = i === 0 ? 0 : Math.max(0, baseWait - elapsed);
+    return { ...c, position: i + 1, waitBefore };
+  });
+  const totalFullWait = cumulative;
   const totalWait = Math.max(0, totalFullWait - elapsed);
-
   return { customers, totalWait, queueOpen };
-};
+}
 
 async function loadQueueFromSupabase() {
   if (!supabase) return;
-  const { data: rows } = await supabase.from('queue').select('id, name, phone, misars, joined_at').order('id', { ascending: true });
-  const { data: meta } = await supabase.from('queue_meta').select('current_started_at, queue_open').eq('id', 1).single();
-  if (rows) queue = rows.map(r => ({ id: r.id, name: r.name, phone: r.phone, misars: r.misars, joinedAt: r.joined_at }));
-  if (meta?.current_started_at != null) currentStartedAt = meta.current_started_at;
-  if (meta?.queue_open !== undefined) queueOpen = meta.queue_open;
+  const [queueRes, metaRes] = await Promise.all([
+    supabase.from('queue').select('id, name, phone, misars, joined_at').order('id', { ascending: true }),
+    supabase.from('queue_meta').select('current_started_at, queue_open').eq('id', 1).single()
+  ]);
+  if (queueRes.data) queue = queueRes.data.map(r => ({ id: r.id, name: r.name, phone: r.phone, misars: r.misars, joinedAt: r.joined_at }));
+  if (metaRes.data?.current_started_at != null) currentStartedAt = metaRes.data.current_started_at;
+  if (metaRes.data?.queue_open !== undefined) queueOpen = metaRes.data.queue_open;
 }
 
 async function saveMetaToSupabase() {
@@ -141,7 +137,7 @@ app.post('/api/join', async (req, res) => {
     if (error) {
       return res.status(500).json({ error: 'Failed to join queue' });
     }
-    await supabase.from('queue_joins').insert({ name: row.name, phone: row.phone, misars: row.misars, joined_at: joinedAt, queue_ticket_id: row.id });
+    supabase.from('queue_joins').insert({ name: row.name, phone: row.phone, misars: row.misars, joined_at: joinedAt, queue_ticket_id: row.id }).catch(err => console.warn('queue_joins insert failed:', err.message));
     const ticket = { id: row.id, name: row.name, phone: row.phone, misars: row.misars, joinedAt: row.joined_at };
     if (queue.length === 0) {
       currentStartedAt = joinedAt;
@@ -207,21 +203,34 @@ app.delete('/api/queue/:id', authMiddleware, async (req, res) => {
   res.json({ ok: true });
 });
 
+const SERVER_INFO_CACHE_MS = 45_000; // 45s
+let serverInfoCache = null;
+let serverInfoCacheAt = 0;
+
 app.get('/api/server-info', authMiddleware, (req, res) => {
+  const now = Date.now();
+  if (serverInfoCache && now - serverInfoCacheAt < SERVER_INFO_CACHE_MS) {
+    return res.json(serverInfoCache);
+  }
   const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL;
+  let payload;
   if (baseUrl) {
     const url = baseUrl.replace(/\/$/, '');
-    return res.json({ ip: url, port: PORT, joinUrl: `${url}/join` });
-  }
-  const nets = networkInterfaces();
-  let ip = 'localhost';
-  for (const name of Object.keys(nets)) {
-    for (const net of nets[name]) {
-      if (net.family === 'IPv4' && !net.internal) { ip = net.address; break; }
+    payload = { ip: url, port: PORT, joinUrl: `${url}/join` };
+  } else {
+    const nets = networkInterfaces();
+    let ip = 'localhost';
+    for (const name of Object.keys(nets)) {
+      for (const net of nets[name]) {
+        if (net.family === 'IPv4' && !net.internal) { ip = net.address; break; }
+      }
+      if (ip !== 'localhost') break;
     }
-    if (ip !== 'localhost') break;
+    payload = { ip, port: PORT, joinUrl: `http://${ip}:${PORT}/join` };
   }
-  res.json({ ip, port: PORT, joinUrl: `http://${ip}:${PORT}/join` });
+  serverInfoCache = payload;
+  serverInfoCacheAt = now;
+  res.json(payload);
 });
 
 // SPA fallback (Express 5 / path-to-regexp doesn't accept bare '*')

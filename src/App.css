@@ -285,7 +285,7 @@ body {
   padding: 1.1rem 1.4rem;
   border-radius: var(--radius-lg);
   border: 1px solid var(--clr-border);
-  transition: all 0.2s;
+  transition: opacity 0.2s ease, transform 0.2s ease, border-color 0.2s, background 0.2s;
 }
 .queue-card:hover { border-color: var(--clr-gold); background: var(--clr-surface-2); }
 .queue-card--active { border-color: var(--clr-gold); background: linear-gradient(to right, rgba(198, 147, 75, 0.08), var(--clr-surface)); }
@@ -373,6 +373,17 @@ body {
 }
 .login-btn:hover { opacity: 0.9; transform: translateY(-1px); }
 .login-error { font-size: 0.85rem; color: #b91c1c; background: rgba(220, 50, 50, 0.1); padding: 0.75rem; border-radius: 8px; border: 1px solid rgba(220, 50, 50, 0.2); }
+
+.socket-status-banner {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--clr-gold-dark);
+  background: rgba(184, 134, 11, 0.12);
+  border: 1px solid rgba(184, 134, 11, 0.3);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 1rem;
+  margin-bottom: 1rem;
+}
 
 /* === LIVE QUEUE BANNER (CUSTOMER SIDE) === */
 .live-status-banner {
