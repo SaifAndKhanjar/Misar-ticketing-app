@@ -1,0 +1,86 @@
+/* === ROOT DESIGN TOKENS === */
+:root {
+  --clr-bg: #0e0a0a;
+  --clr-surface: #1c1212;
+  --clr-surface-2: #261818;
+  --clr-border: rgba(180, 120, 60, 0.2);
+  --clr-border-hover: rgba(212, 160, 80, 0.5);
+
+  --clr-gold: #d4a050;
+  --clr-gold-light: #f0c878;
+  --clr-gold-dark: #a07830;
+  --clr-maroon: #8b1a1a;
+  --clr-maroon-light: #b02222;
+  --clr-green: #2d7a4f;
+  --clr-green-light: #3ba06a;
+  --clr-red: #9b2020;
+  --clr-red-light: #c43030;
+  --clr-text: #f5ece0;
+  --clr-text-muted: #9a8070;
+  --clr-text-dim: #6a5545;
+
+  --shadow-gold: 0 0 20px rgba(212, 160, 80, 0.15);
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+
+  --font-sans: 'Inter', sans-serif;
+  --font-arabic: 'Tajawal', sans-serif;
+
+  --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--clr-bg);
+  color: var(--clr-text);
+  min-height: 100vh;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* === SCROLLBAR === */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--clr-surface); }
+::-webkit-scrollbar-thumb { background: var(--clr-gold-dark); border-radius: 3px; }
+
+/* === KEYFRAMES === */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(212, 160, 80, 0.4); }
+  70%  { box-shadow: 0 0 0 10px rgba(212, 160, 80, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(212, 160, 80, 0); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

@@ -1,0 +1,170 @@
+import 'dotenv/config';
+import express from 'express';
+import http from 'http';
+import cors from 'cors';
+import { Server } from 'socket.io';
+import { networkInterfaces } from 'os';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import jwt from 'jsonwebtoken';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const PORT = Number(process.env.PORT) || 3001;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'saif';
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: FRONTEND_ORIGIN } });
+
+app.use(cors({ origin: FRONTEND_ORIGIN }));
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'dist')));
+
+const TOKEN_EXPIRY = '24h';
+
+function authMiddleware(req, res, next) {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    jwt.verify(token, JWT_SECRET);
+    next();
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+}
+
+app.post('/api/login', (req, res) => {
+  const { password } = req.body;
+  if (password === ADMIN_PASSWORD) {
+    const token = jwt.sign({ admin: true }, JWT_SECRET, { expiresIn: TOKEN_EXPIRY });
+    res.json({ ok: true, token });
+  } else {
+    res.status(401).json({ error: 'Incorrect password' });
+  }
+});
+
+let queue = [];
+let nextId = 1;
+let currentStartedAt = null;
+
+const MINS_PER_MISAR = 3;
+const QUEUE_TICK_MS = 60_000;
+
+const getWait = (idx) => {
+  let baseWait = queue.slice(0, idx).reduce((s, c) => s + c.misars * MINS_PER_MISAR, 0);
+  if (idx > 0 && currentStartedAt) {
+    const elapsed = Math.floor((Date.now() - currentStartedAt) / 60000);
+    baseWait = Math.max(0, baseWait - elapsed);
+  }
+  return baseWait;
+};
+
+const getQueueState = () => {
+  const now = Date.now();
+  let elapsed = 0;
+  if (queue.length > 0 && currentStartedAt) {
+    elapsed = Math.floor((now - currentStartedAt) / 60000);
+  }
+
+  const customers = queue.map((c, i) => ({ ...c, position: i + 1, waitBefore: getWait(i) }));
+  const totalFullWait = queue.reduce((s, c) => s + c.misars * MINS_PER_MISAR, 0);
+  const totalWait = Math.max(0, totalFullWait - elapsed);
+
+  return { customers, totalWait };
+};
+
+setInterval(() => {
+  if (queue.length > 0) {
+    io.emit('queue:update', getQueueState());
+  }
+}, QUEUE_TICK_MS);
+
+app.get('/api/queue', (req, res) => res.json(getQueueState()));
+
+function validateJoinBody(body) {
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
+  let misars = parseInt(body.misars, 10);
+  if (Number.isNaN(misars) || misars < 1) misars = 1;
+  if (misars > 10) misars = 10;
+
+  if (!name || name.length > 100) {
+    return { error: 'Invalid name', status: 400 };
+  }
+  if (!phone || phone.length > 20) {
+    return { error: 'Invalid phone', status: 400 };
+  }
+  return { name, phone, misars };
+}
+
+app.post('/api/join', (req, res) => {
+  const validated = validateJoinBody(req.body);
+  if (validated.error) {
+    return res.status(validated.status || 400).json({ error: validated.error });
+  }
+  const { name, phone, misars } = validated;
+  const ticket = { id: nextId++, name, phone, misars, joinedAt: Date.now() };
+
+  if (queue.length === 0) {
+    currentStartedAt = Date.now();
+  }
+
+  queue.push(ticket);
+  const state = getQueueState();
+  io.emit('queue:update', state);
+  res.json(state.customers.find(c => c.id === ticket.id));
+});
+
+app.delete('/api/queue/:id/done', authMiddleware, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) {
+    return res.status(400).json({ error: 'Invalid id' });
+  }
+  const isFront = queue.length > 0 && queue[0].id === id;
+  queue = queue.filter(c => c.id !== id);
+  if (isFront) currentStartedAt = queue.length > 0 ? Date.now() : null;
+  io.emit('queue:update', getQueueState());
+  res.json({ ok: true });
+});
+
+app.delete('/api/queue/:id', authMiddleware, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) {
+    return res.status(400).json({ error: 'Invalid id' });
+  }
+  const isFront = queue.length > 0 && queue[0].id === id;
+  queue = queue.filter(c => c.id !== id);
+  if (isFront) currentStartedAt = queue.length > 0 ? Date.now() : null;
+  io.emit('queue:update', getQueueState());
+  res.json({ ok: true });
+});
+
+app.get('/api/server-info', authMiddleware, (req, res) => {
+  const nets = networkInterfaces();
+  let ip = 'localhost';
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === 'IPv4' && !net.internal) { ip = net.address; break; }
+    }
+    if (ip !== 'localhost') break;
+  }
+  res.json({ ip, port: PORT });
+});
+
+// SPA fallback (Express 5 / path-to-regexp doesn't accept bare '*')
+app.get(/^(?!\/api\/).*/, (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'), (err) => {
+    if (err) res.send('Worker is running. Use Vite dev server for UI.');
+  });
+});
+
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server on ${PORT}`);
+});
