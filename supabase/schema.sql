@@ -10,14 +10,25 @@ create table if not exists public.queue (
   joined_at bigint not null
 );
 
--- Single row: when the current front customer started being served (for wait math)
+-- Single row: when the current front customer started being served (for wait math) + queue open/closed
 create table if not exists public.queue_meta (
   id int primary key default 1 check (id = 1),
-  current_started_at bigint
+  current_started_at bigint,
+  queue_open boolean not null default true
 );
 
-insert into public.queue_meta (id, current_started_at) values (1, null)
+insert into public.queue_meta (id, current_started_at, queue_open) values (1, null, true)
 on conflict (id) do nothing;
+
+-- Permanent log of every customer who joins (for future use; never deleted when they leave the queue)
+create table if not exists public.queue_joins (
+  id bigint generated always as identity primary key,
+  name text not null,
+  phone text not null,
+  misars int not null,
+  joined_at bigint not null,
+  queue_ticket_id bigint
+);
 
 -- Allow backend (anon or service_role) to read/write. If using anon key, disable RLS.
 alter table public.queue enable row level security;
@@ -26,3 +37,5 @@ alter table public.queue_meta enable row level security;
 -- Policy: allow all for service_role and for anon (server-only use; do not expose anon from browser).
 create policy "Allow all for queue" on public.queue for all using (true) with check (true);
 create policy "Allow all for queue_meta" on public.queue_meta for all using (true) with check (true);
+alter table public.queue_joins enable row level security;
+create policy "Allow all for queue_joins" on public.queue_joins for all using (true) with check (true);

@@ -114,7 +114,7 @@ function getAuthHeaders() {
 
 function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem('admin_token'));
-  const [queueData, setQueueData] = useState({ customers: [], totalWait: 0 });
+  const [queueData, setQueueData] = useState({ customers: [], totalWait: 0, queueOpen: true });
   const [serverInfo, setServerInfo] = useState({ joinUrl: 'http://localhost:3001/join' });
   const [actionError, setActionError] = useState('');
   const [loadingId, setLoadingId] = useState(null);
@@ -201,8 +201,25 @@ function AdminDashboard() {
     }
   };
 
+  const handleToggleQueue = async () => {
+    setActionError('');
+    try {
+      const res = await fetch('/api/queue/toggle', {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      if (res.status === 401) handleUnauthorized();
+      else if (res.ok) {
+        const data = await res.json();
+        setQueueData(prev => ({ ...prev, queueOpen: data.queueOpen }));
+      } else setActionError('Failed to update queue status');
+    } catch {
+      setActionError('Connection error');
+    }
+  };
+
   const joinUrl = serverInfo.joinUrl || `http://${serverInfo.ip || 'localhost'}:${serverInfo.port || 3001}/join`;
-  const { customers, totalWait } = queueData;
+  const { customers, totalWait, queueOpen = true } = queueData;
 
   return (
     <div className="app">
@@ -242,6 +259,25 @@ function AdminDashboard() {
                 <li>Real-time sync: <strong>Active</strong></li>
                 <li>Logo: <strong>سيف و خنجر</strong></li>
               </ul>
+            </div>
+
+            <div className="queue-status-card">
+              <div className="queue-status-header">
+                <span className="queue-status-label">Queue</span>
+                <span className={`queue-status-badge ${queueOpen ? 'queue-status-badge--open' : 'queue-status-badge--closed'}`}>
+                  {queueOpen ? 'Open' : 'Closed'}
+                </span>
+              </div>
+              <p className="queue-status-hint">
+                {queueOpen ? 'New customers can join. Stop to pause new joins.' : 'No new joins. People already in line stay.'}
+              </p>
+              <button
+                type="button"
+                className={`queue-status-btn ${queueOpen ? 'queue-status-btn--stop' : 'queue-status-btn--start'}`}
+                onClick={handleToggleQueue}
+              >
+                {queueOpen ? 'Stop queue' : 'Start queue'}
+              </button>
             </div>
           </aside>
 

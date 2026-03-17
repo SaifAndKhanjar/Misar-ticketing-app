@@ -175,6 +175,69 @@ body {
 .info-list li { font-size: 0.9rem; color: var(--clr-gold-light); }
 .info-list strong { color: var(--clr-gold-bright); }
 
+.queue-status-card {
+  background: var(--clr-panel-dark);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  border: 1px solid rgba(184, 134, 11, 0.25);
+}
+.queue-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+.queue-status-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--clr-gold-bright);
+  text-transform: uppercase;
+}
+.queue-status-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+.queue-status-badge--open {
+  background: rgba(34, 197, 94, 0.3);
+  color: #86efac;
+}
+.queue-status-badge--closed {
+  background: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+.queue-status-hint {
+  font-size: 0.82rem;
+  color: var(--clr-gold-light);
+  margin-bottom: 1rem;
+  line-height: 1.4;
+}
+.queue-status-btn {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: var(--transition);
+}
+.queue-status-btn--stop {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+}
+.queue-status-btn--stop:hover {
+  background: rgba(239, 68, 68, 0.35);
+}
+.queue-status-btn--start {
+  background: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+}
+.queue-status-btn--start:hover {
+  background: rgba(34, 197, 94, 0.35);
+}
+
 /* === QUEUE === */
 .queue-section { display: flex; flex-direction: column; gap: 1.25rem; }
 .queue-header { margin-bottom: 0.25rem; }

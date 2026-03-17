@@ -96,7 +96,7 @@ export default function CustomerJoin() {
   const [loading, setLoading] = useState(false);
   const [ticket, setTicket] = useState(null);
   const [error, setError] = useState('');
-  const [queueData, setQueueData] = useState({ customers: [], totalWait: 0 });
+  const [queueData, setQueueData] = useState({ customers: [], totalWait: 0, queueOpen: true });
 
   useEffect(() => {
     fetch('/api/queue').then(r => r.json()).then(setQueueData);
@@ -120,8 +120,11 @@ export default function CustomerJoin() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), phone: phone.trim(), misars }),
       });
-      if (!res.ok) throw new Error('Server error');
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || 'Could not join the queue. Please try again.');
+        return;
+      }
       setTicket(data);
     } catch {
       setError('Could not join the queue. Please check your connection and try again.');
@@ -145,7 +148,7 @@ export default function CustomerJoin() {
     );
   }
 
-  const { customers } = queueData;
+  const { customers, queueOpen = true } = queueData;
 
   return (
     <div className="join-page">
@@ -172,7 +175,13 @@ export default function CustomerJoin() {
           </div>
         </div>
 
-        {/* Form card */}
+        {!queueOpen ? (
+          <div className="join-form-card join-closed-card">
+            <h2 className="join-title">Queue is closed</h2>
+            <p className="join-subtitle">The queue is not accepting new joins right now. People already in line will still be served. Please try again later.</p>
+          </div>
+        ) : (
+        /* Form card */
         <div className="join-form-card">
           <div className="join-intro">
             <h2 className="join-title">Join the Misar Queue</h2>
@@ -250,6 +259,7 @@ export default function CustomerJoin() {
             </button>
           </form>
         </div>
+        )}
       </div>
     </div>
   );

@@ -59,6 +59,7 @@ app.post('/api/login', (req, res) => {
 
 let queue = [];
 let currentStartedAt = null;
+let queueOpen = true;
 
 const MINS_PER_MISAR = 3;
 const QUEUE_TICK_MS = 60_000;
@@ -83,20 +84,21 @@ const getQueueState = () => {
   const totalFullWait = queue.reduce((s, c) => s + c.misars * MINS_PER_MISAR, 0);
   const totalWait = Math.max(0, totalFullWait - elapsed);
 
-  return { customers, totalWait };
+  return { customers, totalWait, queueOpen };
 };
 
 async function loadQueueFromSupabase() {
   if (!supabase) return;
   const { data: rows } = await supabase.from('queue').select('id, name, phone, misars, joined_at').order('id', { ascending: true });
-  const { data: meta } = await supabase.from('queue_meta').select('current_started_at').eq('id', 1).single();
+  const { data: meta } = await supabase.from('queue_meta').select('current_started_at, queue_open').eq('id', 1).single();
   if (rows) queue = rows.map(r => ({ id: r.id, name: r.name, phone: r.phone, misars: r.misars, joinedAt: r.joined_at }));
   if (meta?.current_started_at != null) currentStartedAt = meta.current_started_at;
+  if (meta?.queue_open !== undefined) queueOpen = meta.queue_open;
 }
 
 async function saveMetaToSupabase() {
   if (!supabase) return;
-  await supabase.from('queue_meta').update({ current_started_at: currentStartedAt }).eq('id', 1);
+  await supabase.from('queue_meta').update({ current_started_at: currentStartedAt, queue_open: queueOpen }).eq('id', 1);
 }
 
 setInterval(() => {
@@ -124,6 +126,9 @@ function validateJoinBody(body) {
 }
 
 app.post('/api/join', async (req, res) => {
+  if (!queueOpen) {
+    return res.status(403).json({ error: 'Queue is currently closed. Please try again later.' });
+  }
   const validated = validateJoinBody(req.body);
   if (validated.error) {
     return res.status(validated.status || 400).json({ error: validated.error });
@@ -136,6 +141,7 @@ app.post('/api/join', async (req, res) => {
     if (error) {
       return res.status(500).json({ error: 'Failed to join queue' });
     }
+    await supabase.from('queue_joins').insert({ name: row.name, phone: row.phone, misars: row.misars, joined_at: joinedAt, queue_ticket_id: row.id });
     const ticket = { id: row.id, name: row.name, phone: row.phone, misars: row.misars, joinedAt: row.joined_at };
     if (queue.length === 0) {
       currentStartedAt = joinedAt;
@@ -154,6 +160,13 @@ app.post('/api/join', async (req, res) => {
   const state = getQueueState();
   io.emit('queue:update', state);
   res.json(state.customers.find(c => c.id === ticket.id));
+});
+
+app.post('/api/queue/toggle', authMiddleware, async (req, res) => {
+  queueOpen = !queueOpen;
+  if (supabase) await saveMetaToSupabase();
+  io.emit('queue:update', getQueueState());
+  res.json({ queueOpen });
 });
 
 app.delete('/api/queue/:id/done', authMiddleware, async (req, res) => {

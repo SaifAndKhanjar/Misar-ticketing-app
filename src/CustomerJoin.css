@@ -146,6 +146,19 @@
   color: #6b5a4a;
 }
 
+.join-closed-card {
+  text-align: center;
+  padding: 2rem 1.5rem;
+}
+.join-closed-card .join-title {
+  color: #b91c1c;
+  margin-bottom: 0.5rem;
+}
+.join-closed-card .join-subtitle {
+  color: #6b5a4a;
+  line-height: 1.5;
+}
+
 /* ── Form ── */
 .join-form {
   display: flex;
