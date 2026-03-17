@@ -45,6 +45,25 @@ In development, the default password is `saif` if `ADMIN_PASSWORD` is not set. S
    ```
    The server serves the built app from `dist/` and handles SPA routing. Use `PORT` to bind (e.g. `PORT=80`).
 
+## Deploy on Render (one place, free tier)
+
+Host the whole app (frontend + backend) on [Render](https://render.com) in one step:
+
+1. Push this repo to GitHub (you already have `misar-ticketing-app`).
+2. Go to [dashboard.render.com](https://dashboard.render.com) → **New** → **Web Service**.
+3. Connect your GitHub account and select the **misar-ticketing-app** repository.
+4. Render will pick up `render.yaml` if present, or set manually:
+   - **Build Command:** `npm install && npm run build`
+   - **Start Command:** `npm start`
+   - **Health Check Path:** `/api/health`
+5. In **Environment**, add:
+   - `ADMIN_PASSWORD` — your admin dashboard password (required).
+   - `JWT_SECRET` — a long random string (e.g. generate one; required for production).
+   - `FRONTEND_ORIGIN` is optional: on Render it defaults to your service URL so CORS and Socket.IO work.
+6. Click **Create Web Service**. After the first deploy you’ll get a URL like `https://misar-ticketing-app.onrender.com`.
+
+**Note:** On the free tier the service may spin down after inactivity; the first request after a while can be slow. The queue is in-memory, so it resets when the service restarts.
+
 ## Scripts
 
 | Script     | Description                          |

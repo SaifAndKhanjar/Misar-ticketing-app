@@ -14,7 +14,7 @@ const __dirname = path.dirname(__filename);
 const PORT = Number(process.env.PORT) || 3001;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'saif';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5173';
 
 const app = express();
 const server = http.createServer(app);
@@ -39,6 +39,8 @@ function authMiddleware(req, res, next) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 }
+
+app.get('/api/health', (req, res) => res.status(200).json({ ok: true }));
 
 app.post('/api/login', (req, res) => {
   const { password } = req.body;
