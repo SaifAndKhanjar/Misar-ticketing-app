@@ -318,6 +318,8 @@ function AdminDashboard() {
     }
   };
 
+  const joinUrl = serverInfo.joinUrl || `http://${serverInfo.ip || 'localhost'}:${serverInfo.port || 3001}/join`;
+
   const downloadA4QrPng = useCallback(async () => {
     const qrSvg = qrWrapRef.current?.querySelector('svg');
     if (!qrSvg) return;
@@ -385,7 +387,6 @@ function AdminDashboard() {
     }
   }, [joinUrl]);
 
-  const joinUrl = serverInfo.joinUrl || `http://${serverInfo.ip || 'localhost'}:${serverInfo.port || 3001}/join`;
   const { customers, totalWait, queueOpen = true } = queueData;
 
   return (
