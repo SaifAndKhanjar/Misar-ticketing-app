@@ -367,6 +367,54 @@ body {
   .wait-value { font-size: 1rem; }
 }
 
+/* iPhone / small screens */
+@media (max-width: 480px) {
+  .header { padding: 0 0.9rem; }
+  .header-inner {
+    height: auto;
+    padding: 0.65rem 0;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  .header-brand { gap: 10px; }
+  .header-logo { width: 40px; height: 40px; }
+  .brand-title { font-size: 1.1rem; }
+  .brand-subtitle { font-size: 0.62rem; }
+
+  .header-meta {
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 52%;
+  }
+  .live-clock { font-size: 0.82rem; }
+  .queue-badge { font-size: 0.78rem; }
+  .header-logout { padding: 0.35rem 0.55rem; font-size: 0.76rem; }
+
+  .main { padding: 1.25rem 0.9rem; }
+
+  .stats-bar {
+    flex-direction: column;
+    border-radius: var(--radius-lg);
+  }
+  .stat {
+    padding: 0.85rem 1rem;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    text-align: left;
+  }
+  .stat-value { font-size: 1.3rem; margin-bottom: 0; }
+  .stat-label { font-size: 0.65rem; }
+  .stat-divider { width: 100%; height: 1px; margin: 0; }
+
+  .queue-card-left { gap: 12px; }
+  .customer-meta { flex-wrap: wrap; row-gap: 6px; }
+  .meta-pill { font-size: 0.7rem; }
+  .queue-card-right { gap: 0.9rem; }
+  .btn-done, .btn-remove { width: 36px; height: 36px; }
+}
+
 /* === LOGIN SCREEN === */
 .login-screen {
   min-height: 100vh;
