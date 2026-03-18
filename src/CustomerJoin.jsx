@@ -120,11 +120,18 @@ export default function CustomerJoin() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), phone: phone.trim(), misars }),
       });
-      const data = await res.json().catch(() => ({}));
+      const raw = await res.text();
+      let data = {};
+      try { data = raw ? JSON.parse(raw) : {}; } catch { data = {}; }
+
       if (!res.ok) {
-        setError(data.error || 'Could not join the queue. Please try again.');
+        const msg =
+          (data && typeof data.error === 'string' && data.error) ||
+          `Could not join the queue (HTTP ${res.status}). Please try again.`;
+        setError(msg);
         return;
       }
+
       setTicket(data);
     } catch {
       setError('Could not join the queue. Please check your connection and try again.');
