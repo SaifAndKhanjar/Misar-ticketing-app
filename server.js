@@ -150,7 +150,15 @@ app.post('/api/join', async (req, res) => {
       const suffix = process.env.NODE_ENV === 'production' ? '' : ` (${error.message})`;
       return res.status(500).json({ error: `Failed to join queue${suffix}` });
     }
-    supabase.from('queue_joins').insert({ name: row.name, phone: row.phone, misars: row.misars, joined_at: joinedAt, queue_ticket_id: row.id }).catch(err => console.warn('queue_joins insert failed:', err.message));
+    // Fire-and-forget (do not await): Supabase v2 builders aren't real Promises (no .catch()).
+    void (async () => {
+      const { error: joinErr } = await supabase
+        .from('queue_joins')
+        .insert({ name: row.name, phone: row.phone, misars: row.misars, joined_at: joinedAt, queue_ticket_id: row.id });
+      if (joinErr) {
+        console.warn('queue_joins insert failed:', joinErr.message);
+      }
+    })();
     const ticket = { id: row.id, name: row.name, phone: row.phone, misars: row.misars, joinedAt: row.joined_at };
     if (queue.length === 0) {
       currentStartedAt = joinedAt;
