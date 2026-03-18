@@ -94,7 +94,13 @@ async function loadQueueFromSupabase() {
 
 async function saveMetaToSupabase() {
   if (!supabase) return;
-  await supabase.from('queue_meta').update({ current_started_at: currentStartedAt, queue_open: queueOpen }).eq('id', 1);
+  const { error } = await supabase
+    .from('queue_meta')
+    .update({ current_started_at: currentStartedAt, queue_open: queueOpen })
+    .eq('id', 1);
+  if (error) {
+    console.warn('Supabase queue_meta update failed:', error.message);
+  }
 }
 
 setInterval(() => {
@@ -135,7 +141,14 @@ app.post('/api/join', async (req, res) => {
   if (supabase) {
     const { data: row, error } = await supabase.from('queue').insert({ name, phone, misars, joined_at: joinedAt }).select('id, name, phone, misars, joined_at').single();
     if (error) {
-      return res.status(500).json({ error: 'Failed to join queue' });
+      console.error('Supabase queue insert failed:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+      const suffix = process.env.NODE_ENV === 'production' ? '' : ` (${error.message})`;
+      return res.status(500).json({ error: `Failed to join queue${suffix}` });
     }
     supabase.from('queue_joins').insert({ name: row.name, phone: row.phone, misars: row.misars, joined_at: joinedAt, queue_ticket_id: row.id }).catch(err => console.warn('queue_joins insert failed:', err.message));
     const ticket = { id: row.id, name: row.name, phone: row.phone, misars: row.misars, joinedAt: row.joined_at };
