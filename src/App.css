@@ -316,7 +316,11 @@ body {
   border: 1px solid var(--clr-border);
   transition: opacity 0.2s ease, transform 0.2s ease, border-color 0.2s, background 0.2s;
 }
-.queue-card:hover { border-color: var(--clr-gold); background: var(--clr-surface-2); }
+.queue-card:hover {
+  border-color: var(--clr-gold);
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), var(--clr-surface-2));
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.08);
+}
 .queue-card--active { border-color: var(--clr-gold); background: linear-gradient(to right, rgba(198, 147, 75, 0.08), var(--clr-surface)); }
 
 .queue-card-left { display: flex; align-items: center; gap: 16px; }
@@ -342,6 +346,15 @@ body {
   display: flex; align-items: center; gap: 4px; font-size: 0.72rem;
   background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 20px; color: var(--clr-text-dim);
 }
+
+.queue-card:hover .customer-name { color: #1e1510; }
+.queue-card:hover .meta-pill {
+  background: rgba(184, 134, 11, 0.10);
+  border: 1px solid rgba(184, 134, 11, 0.18);
+  color: #3a2010;
+}
+.queue-card:hover .wait-value,
+.queue-card:hover .wait-now { color: #3a2010; }
 
 .queue-card-right { display: flex; align-items: center; gap: 1.5rem; }
 .wait-now { font-size: 0.85rem; font-weight: 700; color: var(--clr-gold-light); }
