@@ -117,7 +117,12 @@ app.get('/api/queue', (req, res) => res.json(getQueueState()));
 
 function validateJoinBody(body) {
   const name = typeof body.name === 'string' ? body.name.trim() : '';
-  const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
+  const rawPhone = typeof body.phone === 'string' ? body.phone.trim() : '';
+  const digitsOnly = rawPhone.replace(/\\D/g, '');
+  // Oman numbers should be 8 digits. If user typed +968/968, strip it.
+  const phone = digitsOnly.length > 8 && digitsOnly.startsWith('968')
+    ? digitsOnly.slice(-8)
+    : digitsOnly;
   let misars = parseInt(body.misars, 10);
   if (Number.isNaN(misars) || misars < 1) misars = 1;
   if (misars > 10) misars = 10;
@@ -125,8 +130,8 @@ function validateJoinBody(body) {
   if (!name || name.length > 100) {
     return { error: 'Invalid name', status: 400 };
   }
-  if (!phone || phone.length > 20) {
-    return { error: 'Invalid phone', status: 400 };
+  if (!/^\\d{8}$/.test(phone)) {
+    return { error: 'Phone number must be exactly 8 digits (do not include +968).', status: 400 };
   }
   return { name, phone, misars };
 }

@@ -98,6 +98,11 @@ export default function CustomerJoin() {
   const [error, setError] = useState('');
   const [queueData, setQueueData] = useState({ customers: [], totalWait: 0, queueOpen: true });
   const [showQueueNames, setShowQueueNames] = useState(false);
+  const normalizePhone = (value) => {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (digits.startsWith('968') && digits.length > 8) return digits.slice(-8);
+    return digits.slice(0, 8);
+  };
 
   useEffect(() => {
     fetch('/api/queue').then(r => r.json()).then(setQueueData);
@@ -110,8 +115,13 @@ export default function CustomerJoin() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!name.trim() || !phone.trim()) {
+    const normalizedPhone = normalizePhone(phone);
+    if (!name.trim() || !normalizedPhone) {
       setError('Please fill in your name and phone number.');
+      return;
+    }
+    if (normalizedPhone.length !== 8) {
+      setError('Phone number must be exactly 8 digits (do not include +968).');
       return;
     }
     setLoading(true);
@@ -119,7 +129,7 @@ export default function CustomerJoin() {
       const res = await fetch('/api/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), phone: phone.trim(), misars }),
+        body: JSON.stringify({ name: name.trim(), phone: normalizedPhone, misars }),
       });
       const raw = await res.text();
       let data = {};
@@ -250,12 +260,14 @@ export default function CustomerJoin() {
                 id="j-phone"
                 type="tel"
                 className="jfield-input"
-                placeholder="e.g. 9XXXXXXX"
+                placeholder="8 digits (e.g. 9XXXXXXX)"
                 value={phone}
-                onChange={e => setPhone(e.target.value)}
+                onChange={e => setPhone(normalizePhone(e.target.value))}
                 required
                 autoComplete="tel"
-                inputMode="tel"
+                inputMode="numeric"
+                maxLength={8}
+                pattern="\\d{8}"
               />
             </div>
 
