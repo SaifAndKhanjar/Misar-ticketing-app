@@ -222,7 +222,7 @@ function AdminDashboard() {
     socket.on('queue:update', (data) => setQueueData(data));
 
     return () => socket.off('queue:update');
-  }, [isAuthenticated, handleUnauthorized]);
+  }, [isAuthenticated, handleUnauthorized, setActionErrorWithAutoClear]);
 
   const handleLogin = () => {
     setIsAuthenticated(true);
@@ -234,10 +234,6 @@ function AdminDashboard() {
     localStorage.removeItem('admin_token');
     setIsAuthenticated(false);
   };
-
-  if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
-  }
 
   const handleDone = async (id) => {
     setActionError('');
@@ -388,6 +384,10 @@ function AdminDashboard() {
   }, [joinUrl]);
 
   const { customers, totalWait, queueOpen = true } = queueData;
+
+  if (!isAuthenticated) {
+    return <Login onLogin={handleLogin} />;
+  }
 
   return (
     <div className="app">

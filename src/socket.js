@@ -7,16 +7,16 @@ export const socket = socketIO(URL, { autoConnect: true });
 
 /** Connection status: 'connected' | 'connecting' | 'disconnected' */
 export function useSocketStatus() {
-  const [status, setStatus] = useState(socket.connected ? 'connected' : 'disconnected');
+  const [status, setStatus] = useState(() => {
+    if (socket.connected) return 'connected';
+    if (socket.connecting) return 'connecting';
+    return 'disconnected';
+  });
 
   useEffect(() => {
     const onConnect = () => setStatus('connected');
     const onDisconnect = () => setStatus('disconnected');
     const onConnectError = () => setStatus('disconnected');
-
-    if (socket.connected) setStatus('connected');
-    else if (socket.connecting) setStatus('connecting');
-    else setStatus('disconnected');
 
     socket.io.on('reconnect_attempt', () => setStatus('connecting'));
     socket.on('connect', onConnect);
