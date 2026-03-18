@@ -176,6 +176,7 @@ function AdminDashboard() {
   const [loadingId, setLoadingId] = useState(null);
   const [toggleLoading, setToggleLoading] = useState(false);
   const socketStatus = useSocketStatus();
+  const qrWrapRef = useRef(null);
 
   const setActionErrorWithAutoClear = useCallback((message) => {
     if (actionErrorTimeoutRef.current) clearTimeout(actionErrorTimeoutRef.current);
@@ -317,6 +318,73 @@ function AdminDashboard() {
     }
   };
 
+  const downloadA4QrPng = useCallback(async () => {
+    const qrSvg = qrWrapRef.current?.querySelector('svg');
+    if (!qrSvg) return;
+
+    // A4 @ 300 DPI
+    const W = 2480;
+    const H = 3508;
+    const qrSize = 1400;
+    const qrX = Math.round((W - qrSize) / 2);
+    const qrY = 700;
+
+    const qrSerialized = new XMLSerializer().serializeToString(qrSvg);
+    const qrBlob = new Blob([qrSerialized], { type: 'image/svg+xml;charset=utf-8' });
+    const qrUrl = URL.createObjectURL(qrBlob);
+
+    try {
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = qrUrl;
+      await img.decode();
+
+      const canvas = document.createElement('canvas');
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // Background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, W, H);
+
+      // Title
+      ctx.fillStyle = '#3a2010';
+      ctx.textAlign = 'center';
+      ctx.font = '700 90px Inter, Arial, sans-serif';
+      ctx.fillText('Saif & Khanjar', W / 2, 240);
+      ctx.font = '800 110px Tajawal, Arial, sans-serif';
+      ctx.fillText('سيف و خنجر', W / 2, 370);
+
+      // Subtitle + URL
+      ctx.font = '600 48px Inter, Arial, sans-serif';
+      ctx.fillStyle = '#7a4a18';
+      ctx.fillText('Scan to join the queue', W / 2, 470);
+      ctx.font = '600 38px Inter, Arial, sans-serif';
+      ctx.fillStyle = '#3a2010';
+      ctx.fillText(joinUrl, W / 2, 540);
+
+      // QR
+      ctx.drawImage(img, qrX, qrY, qrSize, qrSize);
+
+      // Footer hint
+      ctx.font = '500 34px Inter, Arial, sans-serif';
+      ctx.fillStyle = '#7a5a38';
+      ctx.fillText('Keep this poster near the counter for customers.', W / 2, H - 220);
+
+      const outUrl = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = outUrl;
+      a.download = 'misar-queue-qr-a4.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } finally {
+      URL.revokeObjectURL(qrUrl);
+    }
+  }, [joinUrl]);
+
   const joinUrl = serverInfo.joinUrl || `http://${serverInfo.ip || 'localhost'}:${serverInfo.port || 3001}/join`;
   const { customers, totalWait, queueOpen = true } = queueData;
 
@@ -335,9 +403,12 @@ function AdminDashboard() {
               </div>
               <div className="qr-body">
                 <p className="qr-hint">Customers can scan this to join the queue from their phones.</p>
-                <div className="qr-container">
+                <div className="qr-container" ref={qrWrapRef}>
                   <QRCodeSVG value={joinUrl} size={180} bgColor={"#ffffff"} fgColor={"#3a2010"} level={"H"} includeMargin={true} />
                 </div>
+                <button type="button" className="qr-download-btn" onClick={downloadA4QrPng}>
+                  Download A4 QR (PNG)
+                </button>
                 <div className="qr-url-box">
                   <span className="qr-url-label">Join URL:</span>
                   <code className="qr-url-text">{joinUrl}</code>

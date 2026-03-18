@@ -147,6 +147,25 @@ body {
 .qr-body { padding: 1.5rem; display: flex; flex-direction: column; align-items: center; gap: 1.25rem; }
 .qr-hint { font-size: 0.88rem; color: var(--clr-gold-light); text-align: center; line-height: 1.5; }
 .qr-container { background: white; padding: 12px; border-radius: 12px; }
+.qr-download-btn {
+  width: 100%;
+  border: 1px solid rgba(184, 134, 11, 0.35);
+  background: rgba(184, 134, 11, 0.12);
+  color: var(--clr-gold-bright);
+  font-weight: 800;
+  font-size: 0.85rem;
+  padding: 0.7rem 1rem;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.qr-download-btn:hover {
+  background: rgba(184, 134, 11, 0.22);
+  border-color: rgba(184, 134, 11, 0.6);
+}
+.qr-download-btn:active {
+  transform: translateY(1px);
+}
 .qr-url-box {
   width: 100%;
   min-height: 3rem;
