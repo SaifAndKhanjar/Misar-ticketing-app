@@ -64,6 +64,10 @@ let queueOpen = true;
 const MINS_PER_MISAR = 3;
 const QUEUE_TICK_MS = 60_000;
 
+function round1(n) {
+  return Math.round(n * 10) / 10;
+}
+
 function getQueueState() {
   const now = Date.now();
   const elapsed = queue.length > 0 && currentStartedAt
@@ -150,6 +154,38 @@ app.post('/api/join', async (req, res) => {
       const suffix = process.env.NODE_ENV === 'production' ? '' : ` (${error.message})`;
       return res.status(500).json({ error: `Failed to join queue${suffix}` });
     }
+    // Fire-and-forget: keep a deduped directory of customers (unique by phone).
+    void (async () => {
+      const { data: existing, error: selErr } = await supabase
+        .from('queue_customers')
+        .select('phone, join_count, first_seen_at')
+        .eq('phone', row.phone)
+        .maybeSingle();
+      if (selErr) {
+        console.warn('queue_customers select failed:', selErr.message);
+        return;
+      }
+      if (!existing) {
+        const { error: insErr } = await supabase.from('queue_customers').insert({
+          phone: row.phone,
+          name: row.name,
+          first_seen_at: joinedAt,
+          last_seen_at: joinedAt,
+          join_count: 1
+        });
+        if (insErr) console.warn('queue_customers insert failed:', insErr.message);
+        return;
+      }
+      const { error: updErr } = await supabase
+        .from('queue_customers')
+        .update({
+          name: row.name,
+          last_seen_at: joinedAt,
+          join_count: (existing.join_count || 0) + 1
+        })
+        .eq('phone', row.phone);
+      if (updErr) console.warn('queue_customers update failed:', updErr.message);
+    })();
     // Fire-and-forget (do not await): Supabase v2 builders aren't real Promises (no .catch()).
     void (async () => {
       const { error: joinErr } = await supabase
@@ -192,11 +228,33 @@ app.delete('/api/queue/:id/done', authMiddleware, async (req, res) => {
     return res.status(400).json({ error: 'Invalid id' });
   }
   const isFront = queue.length > 0 && queue[0].id === id;
+  const doneTicket = queue.find(c => c.id === id);
+  const startedAtForTicket = isFront ? currentStartedAt : null;
+  const endedAtForTicket = Date.now();
   if (supabase) {
     const { error } = await supabase.from('queue').delete().eq('id', id);
     if (error) return res.status(500).json({ error: 'Failed to update queue' });
   }
   queue = queue.filter(c => c.id !== id);
+  if (supabase && isFront && doneTicket && startedAtForTicket) {
+    const actualMinutes = round1((endedAtForTicket - startedAtForTicket) / 60000);
+    const expectedMinutes = doneTicket.misars * MINS_PER_MISAR;
+    const minutesPerMisar = round1(actualMinutes / Math.max(1, doneTicket.misars));
+    void (async () => {
+      const { error: metricErr } = await supabase.from('queue_service_metrics').insert({
+        queue_ticket_id: doneTicket.id,
+        name: doneTicket.name,
+        phone: doneTicket.phone,
+        misars: doneTicket.misars,
+        started_at: startedAtForTicket,
+        ended_at: endedAtForTicket,
+        actual_minutes: actualMinutes,
+        expected_minutes: expectedMinutes,
+        minutes_per_misar: minutesPerMisar
+      });
+      if (metricErr) console.warn('queue_service_metrics insert failed:', metricErr.message);
+    })();
+  }
   if (isFront) {
     currentStartedAt = queue.length > 0 ? Date.now() : null;
     if (supabase) await saveMetaToSupabase();

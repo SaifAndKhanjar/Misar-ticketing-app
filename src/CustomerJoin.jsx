@@ -296,6 +296,10 @@ export default function CustomerJoin() {
                 <>Join Queue</>
               )}
             </button>
+
+            <div className="join-disclaimer" aria-hidden="true">
+              By joining, you agree we may use your phone number to share updates and offers in the future.
+            </div>
           </form>
         </div>
         )}

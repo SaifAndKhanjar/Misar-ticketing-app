@@ -303,6 +303,15 @@
   color: #b91c1c;
 }
 
+.join-disclaimer {
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  color: rgba(59, 43, 29, 0.55);
+  line-height: 1.35;
+  text-align: center;
+  user-select: none;
+}
+
 /* ── Fields ── */
 .jfield {
   display: flex;
