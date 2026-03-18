@@ -97,6 +97,7 @@ export default function CustomerJoin() {
   const [ticket, setTicket] = useState(null);
   const [error, setError] = useState('');
   const [queueData, setQueueData] = useState({ customers: [], totalWait: 0, queueOpen: true });
+  const [showQueueNames, setShowQueueNames] = useState(false);
 
   useEffect(() => {
     fetch('/api/queue').then(r => r.json()).then(setQueueData);
@@ -169,17 +170,48 @@ export default function CustomerJoin() {
         </div>
 
         {/* Current Queue info box */}
-        <div className="join-queue-box">
+        <button
+          type="button"
+          className={`join-queue-box ${showQueueNames ? 'join-queue-box--open' : ''}`}
+          onClick={() => setShowQueueNames(v => !v)}
+          aria-expanded={showQueueNames}
+          aria-controls="join-queue-names"
+        >
           <div className="join-queue-left">
             <span className="join-queue-label">Current Queue</span>
             <span className="join-queue-value">{customers.length} {customers.length === 1 ? 'Person' : 'People'} Waiting</span>
+            <span className="join-queue-toggle-hint">
+              {customers.length === 0 ? 'Tap to refresh' : (showQueueNames ? 'Tap to hide names' : 'Tap to view names')}
+            </span>
           </div>
           <div className="join-queue-right">
             <div className={`join-queue-pill ${totalWaitBefore === 0 ? 'join-queue-pill--no-wait' : ''}`}>
               <div className="join-queue-dot" />
               <span>{totalWaitBefore === 0 ? 'No Wait' : `~${formatTime(totalWaitBefore)} wait`}</span>
             </div>
+            <div className={`join-queue-chevron ${showQueueNames ? 'join-queue-chevron--open' : ''}`} aria-hidden="true">
+              ▾
+            </div>
           </div>
+        </button>
+
+        <div
+          id="join-queue-names"
+          className={`join-queue-names ${showQueueNames ? 'join-queue-names--open' : ''}`}
+        >
+          {customers.length === 0 ? (
+            <div className="join-queue-names-empty">No one is waiting right now.</div>
+          ) : (
+            <ol className="join-queue-names-list">
+              {customers.map((c, idx) => (
+                <li key={c.id} className={`join-queue-name ${idx === 0 ? 'join-queue-name--next' : ''}`}>
+                  <span className="join-queue-pos">{idx + 1}</span>
+                  <span className="join-queue-person">{c.name}</span>
+                  {idx === 0 && <span className="join-queue-next">Up next</span>}
+                </li>
+              ))}
+            </ol>
+          )}
         </div>
 
         {!queueOpen ? (

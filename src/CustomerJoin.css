@@ -65,6 +65,24 @@
   align-items: center;
   justify-content: space-between;
   box-shadow: 0 6px 24px rgba(59, 43, 29, 0.25);
+  width: 100%;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.join-queue-box:hover {
+  box-shadow: 0 10px 28px rgba(59, 43, 29, 0.28);
+  transform: translateY(-1px);
+}
+
+.join-queue-box:active {
+  transform: translateY(0);
+}
+
+.join-queue-box--open {
+  margin-bottom: 0.75rem;
 }
 
 .join-queue-left {
@@ -87,8 +105,18 @@
   color: #c18d4d;
 }
 
+.join-queue-toggle-hint {
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+}
+
 .join-queue-right {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .join-queue-pill {
@@ -120,6 +148,106 @@
 .join-queue-pill--no-wait .join-queue-dot {
   background: #86efac;
   box-shadow: 0 0 8px #86efac;
+}
+
+.join-queue-chevron {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 1.1rem;
+  line-height: 1;
+  transform: translateY(-1px);
+  transition: transform 0.2s ease;
+}
+.join-queue-chevron--open {
+  transform: rotate(180deg) translateY(1px);
+}
+
+/* Expandable names list */
+.join-queue-names {
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(107, 74, 47, 0.18);
+  border-radius: 16px;
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: max-height 0.28s ease, opacity 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 10px 28px rgba(59, 43, 29, 0.10);
+}
+
+.join-queue-names--open {
+  max-height: 340px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.join-queue-names-empty {
+  padding: 0.9rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #3b2b1d;
+}
+
+.join-queue-names-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.join-queue-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0.7rem 0.85rem;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 12px;
+  border: 1px solid rgba(107, 74, 47, 0.12);
+  color: #3b2b1d;
+  transition: transform 0.15s ease, background 0.2s ease;
+}
+
+.join-queue-name:hover {
+  background: rgba(255, 255, 255, 0.95);
+  transform: translateX(2px);
+}
+
+.join-queue-name--next {
+  border-color: rgba(193, 141, 77, 0.55);
+  box-shadow: 0 6px 18px rgba(193, 141, 77, 0.18);
+}
+
+.join-queue-pos {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgba(107, 74, 47, 0.10);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #6b4a2f;
+  flex-shrink: 0;
+}
+
+.join-queue-person {
+  font-size: 0.92rem;
+  font-weight: 800;
+  flex: 1;
+}
+
+.join-queue-next {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #a67232;
+  background: rgba(193, 141, 77, 0.14);
+  border: 1px solid rgba(193, 141, 77, 0.25);
+  padding: 4px 8px;
+  border-radius: 999px;
 }
 
 /* ── Form card (white, rounded, shadow) ── */
@@ -210,7 +338,7 @@
   font-family: var(--font-sans);
   color: #1f2937;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, transform 0.15s ease, box-shadow 0.2s ease;
   width: 100%;
 }
 
@@ -220,6 +348,7 @@
 
 .jfield-input:focus {
   border-color: #a67232;
+  box-shadow: 0 0 0 4px rgba(193, 141, 77, 0.14);
 }
 
 /* ── Stepper (dark brown buttons, white minus/plus) ── */
@@ -315,13 +444,18 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   cursor: pointer;
-  transition: background 0.2s, transform 0.2s;
+  transition: background 0.2s, transform 0.15s ease, box-shadow 0.2s ease;
   margin-top: 0.25rem;
 }
 
 .join-submit-btn:hover:not(:disabled) {
   background: #8b6040;
   transform: translateY(-1px);
+  box-shadow: 0 10px 26px rgba(59, 43, 29, 0.18);
+}
+
+.join-submit-btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .join-submit-btn:disabled {
@@ -554,4 +688,18 @@
 .btn-outline-back:hover {
   background: rgba(107, 74, 47, 0.08);
   border-color: #6b4a2f;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .join-container,
+  .ticket-view,
+  .ticket-card,
+  .join-queue-box,
+  .join-queue-names,
+  .join-queue-name,
+  .join-submit-btn,
+  .jfield-input {
+    animation: none !important;
+    transition: none !important;
+  }
 }
