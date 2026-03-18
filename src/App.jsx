@@ -175,6 +175,7 @@ function AdminDashboard() {
   const actionErrorTimeoutRef = useRef(null);
   const [loadingId, setLoadingId] = useState(null);
   const [toggleLoading, setToggleLoading] = useState(false);
+  const [emailReportLoading, setEmailReportLoading] = useState(false);
   const socketStatus = useSocketStatus();
   const qrWrapRef = useRef(null);
 
@@ -383,6 +384,23 @@ function AdminDashboard() {
     }
   }, [joinUrl]);
 
+  const sendTestCustomersEmail = useCallback(async () => {
+    setEmailReportLoading(true);
+    try {
+      const res = await fetch('/api/reports/queue-customers/email', {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) handleUnauthorized();
+      else if (!res.ok) setActionErrorWithAutoClear(data.error || 'Failed to send email report');
+    } catch {
+      setActionErrorWithAutoClear('Connection error');
+    } finally {
+      setEmailReportLoading(false);
+    }
+  }, [handleUnauthorized, setActionErrorWithAutoClear]);
+
   const { customers, totalWait, queueOpen = true } = queueData;
 
   if (!isAuthenticated) {
@@ -409,6 +427,14 @@ function AdminDashboard() {
                 </div>
                 <button type="button" className="qr-download-btn" onClick={downloadA4QrPng}>
                   Download A4 QR (PNG)
+                </button>
+                <button
+                  type="button"
+                  className="qr-download-btn qr-download-btn--secondary"
+                  onClick={sendTestCustomersEmail}
+                  disabled={emailReportLoading}
+                >
+                  {emailReportLoading ? 'Sending…' : 'Send test email (customers CSV)'}
                 </button>
                 <div className="qr-url-box">
                   <span className="qr-url-label">Join URL:</span>

@@ -68,6 +68,48 @@ function round1(n) {
   return Math.round(n * 10) / 10;
 }
 
+function csvEscape(value) {
+  const s = value == null ? '' : String(value);
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function toQueueCustomersCsv(rows) {
+  const headers = ['phone', 'name', 'first_seen_at', 'last_seen_at', 'join_count'];
+  const lines = [headers.join(',')];
+  for (const r of rows || []) {
+    lines.push(headers.map((h) => csvEscape(r?.[h])).join(','));
+  }
+  return lines.join('\n');
+}
+
+async function sendViaResend({ apiKey, from, to, subject, text, filename, content }) {
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from,
+      to: [to],
+      subject,
+      text,
+      attachments: [
+        {
+          filename,
+          content: Buffer.from(content, 'utf8').toString('base64')
+        }
+      ]
+    })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(`Resend failed (${res.status}): ${JSON.stringify(data)}`);
+  }
+  return data;
+}
+
 function getQueueState() {
   const now = Date.now();
   const elapsed = queue.length > 0 && currentStartedAt
@@ -114,6 +156,45 @@ setInterval(() => {
 }, QUEUE_TICK_MS);
 
 app.get('/api/queue', (req, res) => res.json(getQueueState()));
+
+// Manual test: email queue_customers CSV to owner (admin-only)
+app.post('/api/reports/queue-customers/email', authMiddleware, async (req, res) => {
+  if (!supabase) return res.status(400).json({ error: 'Supabase is not enabled on this server.' });
+
+  const apiKey = process.env.RESEND_API_KEY;
+  const to = process.env.REPORT_TO_EMAIL;
+  const from = process.env.REPORT_FROM_EMAIL || 'onboarding@resend.dev';
+  if (!apiKey || !to) {
+    return res.status(400).json({ error: 'Missing email configuration (RESEND_API_KEY / REPORT_TO_EMAIL).' });
+  }
+
+  const { data: rows, error } = await supabase
+    .from('queue_customers')
+    .select('phone, name, first_seen_at, last_seen_at, join_count')
+    .order('last_seen_at', { ascending: false });
+
+  if (error) return res.status(500).json({ error: `Supabase query failed: ${error.message}` });
+
+  const csv = toQueueCustomersCsv(rows || []);
+  const date = new Date().toISOString().slice(0, 10);
+  const filename = `queue_customers_${date}.csv`;
+
+  try {
+    await sendViaResend({
+      apiKey,
+      from,
+      to,
+      subject: `Misar Queue — Customers report (${date}) [manual test]`,
+      text: `Attached is the latest queue_customers export (${rows?.length || 0} rows).`,
+      filename,
+      content: csv
+    });
+    res.json({ ok: true, rows: rows?.length || 0 });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to send email report.' });
+  }
+});
 
 function validateJoinBody(body) {
   const name = typeof body.name === 'string' ? body.name.trim() : '';

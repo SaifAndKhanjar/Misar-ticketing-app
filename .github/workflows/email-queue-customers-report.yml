@@ -2,8 +2,8 @@ name: Email queue_customers report
 
 on:
   schedule:
-    # Daily at 06:00 UTC
-    - cron: "0 6 * * *"
+    # Daily at 00:00 Asia/Muscat (Oman) == 20:00 UTC
+    - cron: "0 20 * * *"
   workflow_dispatch: {}
 
 jobs:

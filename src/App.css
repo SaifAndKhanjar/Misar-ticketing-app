@@ -159,12 +159,23 @@ body {
   cursor: pointer;
   transition: var(--transition);
 }
+.qr-download-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
 .qr-download-btn:hover {
   background: rgba(184, 134, 11, 0.22);
   border-color: rgba(184, 134, 11, 0.6);
 }
 .qr-download-btn:active {
   transform: translateY(1px);
+}
+.qr-download-btn--secondary {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--clr-gold-light);
+}
+.qr-download-btn--secondary:hover {
+  background: rgba(255, 255, 255, 0.10);
 }
 .qr-url-box {
   width: 100%;
