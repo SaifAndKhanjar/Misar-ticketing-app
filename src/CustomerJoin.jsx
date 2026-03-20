@@ -266,7 +266,8 @@ export default function CustomerJoin() {
                 autoComplete="tel"
                 inputMode="numeric"
                 maxLength={8}
-                pattern="\\d{8}"
+                pattern="[0-9]{8}"
+                title="Phone number must be exactly 8 digits."
               />
             </div>
 
