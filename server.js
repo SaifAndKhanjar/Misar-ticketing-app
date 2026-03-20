@@ -208,7 +208,7 @@ function validateJoinBody(body) {
   if (!name || name.length > 100) {
     return { error: 'Invalid name', status: 400 };
   }
-  if (!/^\\d{8}$/.test(phone)) {
+  if (!/^\d{8}$/.test(phone)) {
     return { error: 'Phone number must be exactly 8 digits (do not include +968).', status: 400 };
   }
   return { name, phone, misars };
