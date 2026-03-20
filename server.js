@@ -200,10 +200,7 @@ function validateJoinBody(body) {
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const rawPhone = typeof body.phone === 'string' ? body.phone.trim() : '';
   const digitsOnly = rawPhone.replace(/\\D/g, '');
-  // Oman numbers should be 8 digits. If user typed +968/968, strip it.
-  const phone = digitsOnly.length > 8 && digitsOnly.startsWith('968')
-    ? digitsOnly.slice(-8)
-    : digitsOnly;
+  const phone = digitsOnly;
   let misars = parseInt(body.misars, 10);
   if (Number.isNaN(misars) || misars < 1) misars = 1;
   if (misars > 10) misars = 10;

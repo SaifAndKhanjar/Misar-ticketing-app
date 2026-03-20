@@ -100,7 +100,6 @@ export default function CustomerJoin() {
   const [showQueueNames, setShowQueueNames] = useState(false);
   const normalizePhone = (value) => {
     const digits = String(value || '').replace(/\D/g, '');
-    if (digits.startsWith('968') && digits.length > 8) return digits.slice(-8);
     return digits.slice(0, 8);
   };
 
